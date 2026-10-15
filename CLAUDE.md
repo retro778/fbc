@@ -90,7 +90,9 @@ cd tests && make -f unit-tests.mk make_fbcunit FBC="$FBC"
 cd tests && $FBC -mt -i fbcunit/inc compound/loop.bas fbc-tests.bas -p fbcunit/lib -l fbcunit -x t && ./t
 ```
 
-New test directories must be added to `tests/dirlist.mk` or they are never scanned.
+New test directories must be added to `tests/dirlist.mk` or they are never scanned. The generated
+`tests/unit-tests.inc` and `tests/log-tests-*.inc` lists are only rebuilt when `dirlist.mk` changes, so after
+adding a test file delete the `.inc` (or run `make clean` in `tests/`), otherwise the full run silently skips it.
 
 **Golden-output tests** in `tests/warnings/` and `tests/syntax/` work differently: `./test.sh` (with `FBC`
 set) compiles every `.bas` for five targets (dos, linux-x86, linux-x86_64, win32, win64) and writes fbc's
