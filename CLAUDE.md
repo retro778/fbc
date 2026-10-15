@@ -7,8 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A fork of the FreeBASIC compiler (`fbc`), upstream at https://github.com/freebasic/fbc (SourceForge is the
 original home; the FB forum at https://freebasic.net/forum/ is where upstream discussion happens). The goal of
 this fork is to prepare fixes and improvements to propose upstream via GitHub pull requests, so keep changes
-small, self-contained, and in upstream style (see "Conventions"). The local `origin` remote points at the
-fork; there is no `upstream` remote configured by default, so add one before comparing against upstream.
+small, self-contained, and in upstream style (see "Conventions"). `origin` is the fork
+(retro778/fbc), `upstream` is freebasic/fbc. Local `master` carries fork-only commits (this file), so **cut PR
+branches from `upstream/master`, not from `master`**, or the fork-only commits leak into the PR. Open PRs with
+`gh pr create --repo freebasic/fbc --base master --head retro778:<branch>` (the `gh` CLI is logged in as the
+fork owner), one focused branch per fix, and never push to `upstream`. Keep `master` synced with
+`git fetch upstream && git merge upstream/master`.
 
 Three components live here:
 
@@ -90,7 +94,23 @@ cd tests && make -f unit-tests.mk make_fbcunit FBC="$FBC"
 cd tests && $FBC -mt -i fbcunit/inc compound/loop.bas fbc-tests.bas -p fbcunit/lib -l fbcunit -x t && ./t
 ```
 
-New test directories must be added to `tests/dirlist.mk` or they are never scanned. The generated
+Graphics tests open a screen with the null driver, `screenres w, h, bpp, , fb.GFX_NULL`, so they run headless
+and can inspect pixels with `point()`. Thread-related tests can rely on `-mt` (see `#ifdef __FB_MT__`) because
+the unit tests are built with it everywhere except DOS.
+
+To show that a new test catches a bug, compile the pre-fix version of the one C file from `upstream/master`
+and link its `.o` ahead of the library; the object wins over the archive member:
+
+```sh
+git show upstream/master:src/gfxlib2/gfx_circle.c > old.c
+gcc -DENABLE_MT -Wall -Wextra -Wno-unused-parameter -O2 -I src/gfxlib2 -c old.c -o old.o   # same flags as the makefile
+$FBC -mt -i fbcunit/inc gfx/circle-cursor.bas fbc-tests.bas old.o -p fbcunit/lib -l fbcunit -fbgfx -x t && ./t
+```
+
+`tests/check-suite-names.sh` is not executable; run it as `bash check-suite-names.sh check`. A full log-test
+run leaves untracked test executables behind (e.g. under `tests/cpp/`, `tests/scopes/`); remove them with
+`git clean` before committing. New test directories must be added to `tests/dirlist.mk` or they are never
+scanned. The generated
 `tests/unit-tests.inc` and `tests/log-tests-*.inc` lists are only rebuilt when `dirlist.mk` changes, so after
 adding a test file delete the `.inc` (or run `make clean` in `tests/`), otherwise the full run silently skips it.
 
@@ -163,8 +183,13 @@ anything a compiled FB program links against must keep its ABI stable across bot
   (`c*` parser, `ast*`, `symb*`, `rtl*`, `ir*`, `emit*`, `lex*`, `pp*`, `h*` for private helpers,
   `fb*` for global compiler state).
 - User-visible changes get a line in `changelog.txt` under the current version's `[changed]`, `[added]`,
-  or `[fixed]` section, in the existing `component: description` style, referencing `github #NNN` or
-  `sf.net #NNN` issues where applicable. Upstream maintainers expect this in a PR.
+  or `[fixed]` section, in the existing style: `- github #NNN: component: description` when it closes an
+  issue (`sf.net #NNN` for the old tracker), otherwise `- component: description`. Append to the end of the
+  section. Upstream maintainers expect this in a PR.
+- A todo.txt item that a change completes is removed in the same commit.
+- Upstream has no CI on GitHub; the lead maintainer builds PRs locally and merges in batches, often weeks
+  apart. State in the PR body exactly what was built and run, and say plainly when a platform (win32, DOS)
+  could not be built here.
 - Commit subjects upstream are prefixed by component (`fbc:`, `gas64:`, `rtlib:`, `gfxlib2:`, `tests:`,
   `fbdocs:`).
 - Prefer adding a test for any compiler behavior change: fbcunit for runtime behavior, a `COMPILE_ONLY_*`
